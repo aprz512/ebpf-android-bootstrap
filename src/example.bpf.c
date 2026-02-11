@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
-// Raw Tracepoint example for Android (Pixel 6)
+// Raw Tracepoint example for Android (Pixel 6 / Android 16)
 // 跟踪文件打开操作，输出进程名和文件名
 
 #include "vmlinux.h"
@@ -26,21 +26,21 @@ struct {
 } events SEC(".maps");
 
 // Raw tracepoint 参数结构 (sys_enter)
-struct sys_enter_args {
-    unsigned long long unused;
-    long id;              // 系统调用号
-    unsigned long args[6]; // 系统调用参数
-};
-
+// 注意：raw tracepoint 的参数是通过 pt_regs 传递的
 SEC("raw_tracepoint/sys_enter")
-int raw_tp_sys_enter(struct sys_enter_args *ctx)
+int raw_tp_sys_enter(struct bpf_raw_tracepoint_args *ctx)
 {
+    // ctx->args[0] = pt_regs (寄存器)
+    // ctx->args[1] = syscall number
+    unsigned long syscall_nr = ctx->args[1];
+    
     // 只处理 openat 系统调用
-    if (ctx->id != __NR_openat)
+    if (syscall_nr != __NR_openat)
         return 0;
 
     struct event *e;
     u64 pid_tgid;
+    struct pt_regs *regs = (struct pt_regs *)ctx->args[0];
 
     // 分配 ring buffer 空间
     e = bpf_ringbuf_reserve(&events, sizeof(*e), 0);
@@ -57,9 +57,11 @@ int raw_tp_sys_enter(struct sys_enter_args *ctx)
     bpf_get_current_comm(&e->comm, sizeof(e->comm));
 
     // openat(int dirfd, const char *pathname, int flags, mode_t mode)
-    // 文件名是第二个参数 (args[1])
-    const char *filename_ptr = (const char *)ctx->args[1];
-    bpf_probe_read_user_str(&e->filename, sizeof(e->filename), filename_ptr);
+    // ARM64: x0=dirfd, x1=pathname, x2=flags, x3=mode
+    // 文件名是第二个参数 (x1 寄存器)
+    unsigned long filename_ptr;
+    bpf_probe_read_kernel(&filename_ptr, sizeof(filename_ptr), &regs->regs[1]);
+    bpf_probe_read_user_str(&e->filename, sizeof(e->filename), (const char *)filename_ptr);
 
     // 提交事件
     bpf_ringbuf_submit(e, 0);

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
-// Raw Tracepoint loader for Android (Pixel 6)
-// 使用 libbpf skeleton 加载 eBPF 程序并显示文件打开事件
+// eBPF File Open Tracer for Android
+// 使用 libbpf skeleton + raw_tracepoint（兼容 Android 16）
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,6 +36,7 @@ static void sig_handler(int sig)
 // libbpf 日志回调
 static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
 {
+    // 生产环境可以只显示警告和错误
     if (level == LIBBPF_DEBUG)
         return 0;
     return vfprintf(stderr, format, args);
@@ -85,11 +86,10 @@ int main(int argc, char **argv)
     
     printf("===========================================\n");
     printf("  eBPF File Open Tracer for Android\n");
-    printf("  (Using libbpf skeleton)\n");
+    printf("  (raw_tracepoint/sys_enter)\n");
     printf("===========================================\n\n");
     
     // 使用 skeleton 打开 eBPF 程序
-    // BPF 对象已嵌入到可执行文件中，无需单独的 .bpf.o 文件
     printf("Opening eBPF skeleton...\n");
     skel = example_bpf__open();
     if (!skel) {
@@ -105,7 +105,7 @@ int main(int argc, char **argv)
         goto cleanup;
     }
     
-    // Attach eBPF 程序
+    // Attach eBPF 程序（auto-attach）
     printf("Attaching eBPF program...\n");
     err = example_bpf__attach(skel);
     if (err) {
@@ -156,7 +156,8 @@ int main(int argc, char **argv)
 
 cleanup:
     ring_buffer__free(rb);
-    example_bpf__destroy(skel);  // skeleton 清理函数
+    // skeleton 的 destroy 会自动清理所有 attach 的 links
+    example_bpf__destroy(skel);
     
     return err != 0;
 }

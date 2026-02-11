@@ -14,7 +14,7 @@ LLVM_STRIP ?= llvm-strip
 BPFTOOL ?= bpftool
 
 # Android NDK 配置 (用于编译用户态程序)
-ANDROID_NDK_HOME ?= $(HOME)/Android/Sdk/ndk/27.0.12077973
+ANDROID_NDK_HOME ?= $(HOME)/Android/Sdk/ndk/27.3.13750724
 NDK_TOOLCHAIN := $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/linux-x86_64
 CC_ANDROID := $(NDK_TOOLCHAIN)/bin/aarch64-linux-android30-clang
 
